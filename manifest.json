@@ -24,35 +24,20 @@
       "192": "assets/192.png"
     }
   },
-  "permissions": [
-    "activeTab",
-    "scripting",
-    "storage"
-  ],
-  "host_permissions": [
-    "https://x.com/*"
-  ],
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["https://x.com/*"],
   "content_scripts": [
     {
-      "matches": [
-        "https://x.com/*/status/*"
-      ],
-      "js": [
-        "main.js"
-      ],
+      "matches": ["https://x.com/*/status/*"],
+      "js": ["main.js"],
       "run_at": "document_idle",
       "all_frames": false
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": [
-        "assets/icon.svg",
-        "assets/48.png"
-      ],
-      "matches": [
-        "https://x.com/*"
-      ]
+      "resources": ["assets/icon.svg", "assets/48.png"],
+      "matches": ["https://x.com/*"]
     }
   ],
   "background": {

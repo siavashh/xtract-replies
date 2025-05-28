@@ -1,4 +1,5 @@
 let extractionTabId = null;
+let popupWindowId = null;
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "openPopup") {
@@ -11,19 +12,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         height: 400,
       },
       (window) => {
-        chrome.storage.local.set({ popupWindowId: window.id });
+        popupWindowId = window.id;
       }
     );
   } else if (request.action === "sendReplies") {
-    chrome.storage.local.get(["popupWindowId"], (result) => {
-      if (result.popupWindowId) {
-        chrome.runtime.sendMessage({
-          action: "updatePopup",
-          replies: request.replies,
-          status: request.status,
-        });
-      }
-    });
+    if (popupWindowId) {
+      chrome.runtime.sendMessage({
+        action: "updatePopup",
+        replies: request.replies,
+        status: request.status,
+      });
+    }
   } else if (request.action === "stopLoading") {
     if (extractionTabId) {
       chrome.tabs.sendMessage(
