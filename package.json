@@ -1,0 +1,9 @@
+{
+  "name": "xtract-replies",
+  "version": "1.0.3",
+  "description": "Extract replies from X.com posts and export as CSV/HTML. Ideal for researchers and journalists.",
+  "scripts": {
+    "sync-version": "node -e \"let p=require('./package.json'),m=require('./manifest.json');m.version=p.version;require('fs').writeFileSync('./manifest.json',JSON.stringify(m,null,2)+'\\n')\"",
+    "pack": "npm run sync-version && zip -r xtract-replies-$npm_package_version.zip . -x '.*' -x '__MACOSX' -x 'graphics/*'"
+  }
+}

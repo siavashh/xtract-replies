@@ -24,9 +24,9 @@ To create a distributable version of the extension:
 1. Navigate to the extension folder.
 2. Run the following command in your terminal:
    ```bash
-   zip -r xtract-replies.zip . -x ".*" -x "__MACOSX"
+   npm run pack
    ```
-3. This will create a `xtract-replies.zip` file that you can distribute.
+3. This will create a `xtract-replies-{version}.zip` file that you can distribute.
 
 ## Usage
 

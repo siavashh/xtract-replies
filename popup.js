@@ -449,10 +449,12 @@ document.getElementById("downloadHtmlBtn").addEventListener("click", () => {
       <div class="summary">
         This tweet by ${mainTweet.username || "N/A"} (<a href="${
     mainTweet.tweetUrl || "#"
-  }" target="_blank">@${mainTweet.handle || "N/A"}</a>) 
-        has a total of ${allReplies.length} replies, 
-        ${mainTweet.likes || 0} likes, 
-        and has been seen ${mainTweet.views || 0} times.
+  }" target="_blank">@${mainTweet.handle || "N/A"}</a>)
+        has a total of ${mainTweet.replies || 0} replies. ${
+    allReplies.length
+  } replies were extracted here. It has received ${
+    mainTweet.likes || 0
+  } likes and ${mainTweet.views || 0} views.
       </div>
       <table>
         <thead>

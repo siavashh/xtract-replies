@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Xtract Replies",
   "short_name": "Xtract",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "Extract replies from X.com posts and export as CSV/HTML. Ideal for researchers and journalists.",
   "author": "Siavash Keshmiri",
   "homepage_url": "https://x.com/siavashh",
