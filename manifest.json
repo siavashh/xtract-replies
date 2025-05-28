@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Xtract Replies",
   "short_name": "Xtract",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Extract replies from X.com posts and export as CSV/HTML. Ideal for researchers and journalists.",
   "author": "Siavash Keshmiri",
   "homepage_url": "https://x.com/siavashh",
@@ -24,20 +24,35 @@
       "192": "assets/192.png"
     }
   },
-  "permissions": ["activeTab", "scripting", "storage"],
-  "host_permissions": ["https://x.com/*"],
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://x.com/*"
+  ],
   "content_scripts": [
     {
-      "matches": ["https://x.com/*/status/*"],
-      "js": ["main.js"],
+      "matches": [
+        "https://x.com/*/status/*"
+      ],
+      "js": [
+        "main.js"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["assets/icon.svg", "assets/48.png"],
-      "matches": ["https://x.com/*"]
+      "resources": [
+        "assets/icon.svg",
+        "assets/48.png"
+      ],
+      "matches": [
+        "https://x.com/*"
+      ]
     }
   ],
   "background": {
