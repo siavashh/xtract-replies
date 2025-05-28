@@ -20,7 +20,6 @@ Xtract Replies requests the following permissions solely for its core functional
 - **activeTab:** To interact with the currently open X.com post when you initiate extraction.
 - **host permissions (https://x.com/*):** To read and extract replies from public X.com posts.
 - **scripting:** To inject the content script into the X.com page for extraction.
-- **storage:** To temporarily store extracted replies and user preferences locally in your browser. No data is stored externally.
 
 ## Data Security
 
