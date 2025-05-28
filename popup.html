@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xtract Replies</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@900&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #2a9d8f;
+            --secondary: #e9c369;
+            --muted: #afd3ce;
+            --muted-text: #6b8783;
+            --background: #f8f8f8;
+            --text-color: #1b263b;
+            --danger: #e63946;
+        }
+
+        body {
+            font-family: "Vazirmatn", 'Helvetica Neue', Arial, sans-serif;
+            font-optical-sizing: auto;
+            font-weight: 400;
+            font-style: normal;
+            margin: 0;
+            padding: 10px;
+            width: 580px;
+            height: 360px;
+            overflow: auto;
+            background: var(--background)
+        }
+
+        #status {
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        #replies {
+            max-height: 260px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 5px;
+        }
+
+        .reply {
+            margin-bottom: 10px;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .reply p {
+            margin: 2px 0;
+        }
+
+        .button-container {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 8px 16px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background-color: var(--muted);
+            cursor: not-allowed;
+        }
+
+        #stop {
+            background-color: var(--danger);
+        }
+
+        #stop:disabled {
+            background-color: var(--muted);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="status">Loading replies...</div>
+    <div id="replies"></div>
+    <div class="button-container">
+        <button id="downloadCsvBtn" disabled>Download CSV</button>
+        <button id="downloadHtmlBtn" disabled>Download HTML</button>
+        <button id="stopGrabbingData" disabled>Stop</button>
+    </div>
+    <script src="popup.js"></script>
+</body>
+
+</html>
