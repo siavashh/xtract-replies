@@ -37,5 +37,4 @@ We may update this privacy policy from time to time. Any changes will be posted 
 
 If you have any questions or concerns about this privacy policy or the extension, please contact:
 
-- Siavashh Keshmiri
-- [@siavashh on X.com](https://x.com/siavashh)
+- Siavashh Keshmiri [@siavashh on X.com](https://x.com/siavashh)
