@@ -48,6 +48,18 @@
     btn.style.justifyContent = "center";
     btn.style.width = "34px";
     btn.style.height = "34px";
+    btn.style.border = "none";
+    btn.style.background = "none";
+    btn.style.cursor = "pointer";
+    // hover
+    btn.style.transition = "all 0.3s";
+    btn.onmouseover = () => {
+      btn.style.transform = "scale(1.1)";
+    };
+    btn.onmouseout = () => {
+      btn.style.backgroundColor = "transparent";
+      btn.style.transform = "scale(1)";
+    };
     const img = document.createElement("img");
     img.src = chrome.runtime.getURL("assets/48.png");
     img.style.width = "24px";
