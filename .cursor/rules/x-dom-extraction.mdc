@@ -1,0 +1,32 @@
+---
+description: Guidelines for X.com DOM scraping, element selectors, and infinite scroll mechanics in Xtract
+globs: "main.js"
+alwaysApply: true
+---
+
+# X.com DOM Extraction Guardrails
+
+`main.js` scrapes tweet details and replies directly from X.com's DOM.
+
+## Selectors & DOM Traversal
+
+1. **Main Post Identification**:
+   - Target main post container using `article[role="article"]`.
+   - Inject Xtract button adjacent to Grok actions (`button[aria-label="Grok actions"]`), with fallback only to the top-right More/`[data-testid="caret"]` control.
+   - Never inject next to the bottom engagement `[role="group"]` (causes a duplicate button under the tweet).
+   - Prune any `.xtract-replies-btn` that is not in the chosen top-right host.
+2. **Reply Metadata Extraction**:
+   - Username: `[data-testid="User-Name"] a div[dir="ltr"] span`
+   - Handle: `[data-testid="User-Name"] a[href^="/"]`
+   - Text content: `[data-testid="tweetText"]`
+   - Timestamp / Post URL: `time` element parent link `a[href*="/status/"]`
+3. **Infinite Scroll & Load Detection**:
+   - Scroll the page scroller (`document.scrollingElement` / `window`), not `primaryColumn` via `scrollIntoView`.
+   - Treat growth in `scrollHeight` or `article[role="article"]` count as progress; require a few stagnant rounds before stopping.
+   - Observe DOM changes under `div[data-testid="primaryColumn"]` for button reinjection.
+   - Maintain a set of extracted post IDs/URLs to prevent duplicate reply entries.
+   - Stop at the `cellInnerDiv` containing "Discover more" / "Sourced from across X". Compare cells via their `translateY(...)` offset (X virtualizes with absolute positioning); do not use `getBoundingClientRect() + scrollY` alone.
+
+## Dynamic Page Changes
+
+- X.com is an SPA. On route change, re-check `button[aria-label="Grok actions"]` and verify if the Xtract button (`.xtract-replies-btn`) is present before re-injecting.

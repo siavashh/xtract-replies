@@ -1,0 +1,10 @@
+---
+description: Evaluate and maintain Cursor & Antigravity rules every task
+alwaysApply: true
+---
+
+# Rule Hygiene
+
+- At the start of every task, check if the request introduces durable engineering preferences, DOM selector updates, or packaging expectations.
+- Keep rules concise, concrete, and actionable.
+- Update `.cursor/rules/`, `.cursor/agents/`, `.cursor/skills/`, and `.agents/AGENTS.md` simultaneously when rules change.
