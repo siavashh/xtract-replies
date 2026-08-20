@@ -1,5 +1,49 @@
 (function () {
-  let isLoading = true;
+  let isLoading = false;
+  let extracting = false;
+  let dead = false;
+  let observer = null;
+
+  function isExtensionAlive() {
+    try {
+      return !!(chrome.runtime && chrome.runtime.id);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function teardown() {
+    if (dead) return;
+    dead = true;
+    isLoading = false;
+    extracting = false;
+    if (observer) {
+      observer.disconnect();
+      observer = null;
+    }
+    document.querySelectorAll(".xtract-replies-btn").forEach((btn) => {
+      const wrap = btn.parentElement;
+      if (wrap && wrap.querySelector(".xtract-replies-btn") === btn) {
+        wrap.remove();
+      } else {
+        btn.remove();
+      }
+    });
+  }
+
+  function sendRuntimeMessage(payload) {
+    if (!isExtensionAlive()) {
+      teardown();
+      return;
+    }
+    try {
+      chrome.runtime.sendMessage(payload, () => {
+        void chrome.runtime.lastError;
+      });
+    } catch (error) {
+      teardown();
+    }
+  }
 
   // Utility to wait for an element to appear
   function waitForElement(selector, timeout = 10000) {
@@ -18,30 +62,60 @@
   }
 
   // Find Grok button for the main post only
-  function findGrokButton() {
-    const mainPost = document.querySelector('article[role="article"]');
-    if (!mainPost) return null;
-    return mainPost.querySelector('button[aria-label="Grok actions"]');
+  function getMainPost() {
+    return document.querySelector('article[role="article"]');
   }
 
-  // Inject our button next to Grok
-  let lastInjected = null;
+  // Only the top-right tweet chrome (Grok / More). Never [role="group"] —
+  // that is the bottom engagement bar and caused a duplicate button.
+  function findInjectAnchor() {
+    const mainPost = getMainPost();
+    if (!mainPost) return null;
+    const grokBtn = mainPost.querySelector('button[aria-label="Grok actions"]');
+    if (grokBtn && grokBtn.parentElement) return grokBtn.parentElement;
+    const moreBtn =
+      mainPost.querySelector('button[aria-label="More"]') ||
+      mainPost.querySelector('[data-testid="caret"]');
+    if (moreBtn && moreBtn.parentElement) return moreBtn.parentElement;
+    return null;
+  }
+
+  function removeXtractButton(btn) {
+    const wrap = btn.parentElement;
+    if (wrap && wrap !== document.body && wrap.querySelectorAll(".xtract-replies-btn").length === 1) {
+      wrap.remove();
+    } else {
+      btn.remove();
+    }
+  }
+
+  function pruneStrayButtons(keepHost) {
+    document.querySelectorAll(".xtract-replies-btn").forEach((btn) => {
+      if (keepHost && keepHost.contains(btn)) return;
+      removeXtractButton(btn);
+    });
+  }
+
+  // Inject our button next to Grok (or More menu if Grok is missing)
   function injectXtractButton() {
-    const grokBtn = findGrokButton();
-    if (!grokBtn) return;
-    const grokParent = grokBtn.parentElement;
-    if (!grokParent) return;
-    if (
-      grokParent.parentElement.querySelector(".xtract-replies-btn") &&
-      lastInjected === grokParent
-    )
+    if (dead || !isExtensionAlive()) {
+      teardown();
       return;
-    lastInjected = grokParent;
+    }
+    const anchor = findInjectAnchor();
+    if (!anchor || !anchor.parentElement) {
+      pruneStrayButtons(null);
+      return;
+    }
+    const host = anchor.parentElement;
+    pruneStrayButtons(host);
+    if (host.querySelector(".xtract-replies-btn")) return;
     const wrapper = document.createElement("div");
-    wrapper.className = grokParent.className;
+    wrapper.className = anchor.className;
     const btn = document.createElement("button");
     btn.className = "xtract-replies-btn";
     btn.type = "button";
+    btn.setAttribute("aria-label", "Xtract replies");
     btn.style.padding = "0";
     btn.style.display = "flex";
     btn.style.alignItems = "center";
@@ -61,28 +135,43 @@
       btn.style.transform = "scale(1)";
     };
     const img = document.createElement("img");
-    img.src = chrome.runtime.getURL("assets/48.png");
+    try {
+      img.src = chrome.runtime.getURL("assets/48.png");
+    } catch (error) {
+      teardown();
+      return;
+    }
     img.style.width = "24px";
     img.style.height = "24px";
     btn.appendChild(img);
     btn.onclick = startExtraction;
     wrapper.appendChild(btn);
-    grokParent.parentElement.insertBefore(wrapper, grokParent.nextSibling);
+    host.insertBefore(wrapper, anchor.nextSibling);
   }
 
-  // Scroll to load more replies
-  async function scrollToBottom() {
-    const scrollContainer = document.querySelector(
-      'div[data-testid="primaryColumn"]'
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function getScroller() {
+    return document.scrollingElement || document.documentElement;
+  }
+
+  function articleCount() {
+    return document.querySelectorAll('article[role="article"]').length;
+  }
+
+  // X.com scrolls the window, not primaryColumn. Measuring that column's
+  // scrollHeight and calling scrollIntoView never loads the next replies.
+  async function scrollToLoadMore(previousCount) {
+    const scroller = getScroller();
+    const prevHeight = scroller.scrollHeight;
+    scroller.scrollTo(0, scroller.scrollHeight);
+    window.scrollTo(0, document.body.scrollHeight);
+    await sleep(2000);
+    return (
+      scroller.scrollHeight > prevHeight || articleCount() > previousCount
     );
-    if (!scrollContainer) return false;
-
-    const currentScroll = scrollContainer.scrollHeight;
-    scrollContainer.scrollIntoView({ behavior: "smooth", block: "end" });
-
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    const newScroll = scrollContainer.scrollHeight;
-    return currentScroll !== newScroll;
   }
 
   // Extract reply data
@@ -257,25 +346,80 @@
     return tweetData;
   }
 
+  // X virtualizes the timeline with absolute cells + translateY. Document
+  // scrollY comparisons miss "Discover more" and leak recommended tweets in.
+  function getCellOffset(el) {
+    if (!el) return Number.POSITIVE_INFINITY;
+    const cell =
+      el.closest?.('[data-testid="cellInnerDiv"]') ||
+      (el.matches?.('[data-testid="cellInnerDiv"]') ? el : null);
+    const target = cell || el;
+    const style = target.getAttribute?.("style") || "";
+    const match = style.match(/translateY\(([-\d.]+)px\)/);
+    if (match) return parseFloat(match[1]);
+    return target.getBoundingClientRect().top + window.scrollY;
+  }
+
+  function findDiscoverMoreCell() {
+    return Array.from(
+      document.querySelectorAll('div[data-testid="cellInnerDiv"]')
+    ).find((el) => {
+      const text = (el.innerText || el.textContent || "").trim();
+      return (
+        text.includes("Discover more") ||
+        text.includes("Sourced from across X")
+      );
+    });
+  }
+
+  function isPastDiscoverMore(el, discoverOffset) {
+    if (discoverOffset == null) return false;
+    return getCellOffset(el) >= discoverOffset - 1;
+  }
+
+  function dropRepliesPastDiscoverMore(repliesWithElements) {
+    const discoverCell = findDiscoverMoreCell();
+    if (!discoverCell) return repliesWithElements;
+    const discoverOffset = getCellOffset(discoverCell);
+    return repliesWithElements.filter(
+      (r) => !isPastDiscoverMore(r.element, discoverOffset)
+    );
+  }
+
   // Add stop message handler
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === "stopLoading") {
-      isLoading = false; // Stop the loop
-      sendResponse({ status: "stopped" });
-      return true;
-    }
-  });
+  try {
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      if (request.action === "stopLoading") {
+        isLoading = false; // Stop the loop
+        sendResponse({ status: "stopped" });
+        return true;
+      }
+    });
+  } catch (error) {
+    teardown();
+  }
 
   async function startExtraction() {
+    if (extracting || dead) return;
+    if (!isExtensionAlive()) {
+      teardown();
+      return;
+    }
+    extracting = true;
+    isLoading = true;
     try {
-      // Open popup
-      chrome.runtime.sendMessage({ action: "openPopup" });
+      // Open toolbar popup in the same turn as the click (user gesture).
+      sendRuntimeMessage({ action: "openPopup" });
 
       // Initialize arrays to store replies and their DOM elements
       let repliesWithElements = [];
       let moreReplies = true;
       let scrollAttempts = 0;
-      const maxAttempts = 30;
+      let stagnantRounds = 0;
+      let hitDiscoverMore = false;
+      const maxAttempts = 50;
+      const maxStagnantRounds = 3;
+      const seenUrls = new Set();
 
       // Get main post to exclude it from replies and extract its data
       const mainPost = document.querySelector('article[role="article"]');
@@ -284,9 +428,10 @@
       if (mainPost) {
         mainTweetData = extractReplyData(mainPost, true);
         mainTweetUrl = mainTweetData.tweetUrl;
+        if (mainTweetUrl) seenUrls.add(mainTweetUrl);
       }
       // Send initial loading state with main tweet data
-      chrome.runtime.sendMessage({
+      sendRuntimeMessage({
         action: "sendReplies",
         replies: [],
         mainTweet: mainTweetData,
@@ -295,114 +440,132 @@
 
       // Handle "Show additional replies" sections
       async function expandHiddenReplies() {
-        const showMoreButtons = Array.from(
-          document.querySelectorAll('article[role="article"]')
-        ).filter((el) =>
-          el.textContent.toLowerCase().includes("show additional replies")
-        );
-        for (const button of showMoreButtons) {
-          button.scrollIntoView({ behavior: "smooth", block: "center" });
+        const label =
+          /show (additional )?replies|show more replies|show probable spam/i;
+        const clickables = Array.from(
+          document.querySelectorAll(
+            'button, div[role="button"], article[role="article"]'
+          )
+        ).filter((el) => {
+          const text = (el.innerText || el.textContent || "").trim();
+          return text.length < 80 && label.test(text);
+        });
+        for (const button of clickables) {
+          button.scrollIntoView({ block: "center" });
           button.click();
-          await new Promise((resolve) => setTimeout(resolve, 1500));
+          await sleep(1200);
         }
       }
 
-      while (moreReplies && scrollAttempts < maxAttempts && isLoading) {
+      while (moreReplies && scrollAttempts < maxAttempts && isLoading && !dead) {
+        if (!isExtensionAlive()) {
+          teardown();
+          break;
+        }
         await expandHiddenReplies();
         if (!isLoading) break;
+        const previousCount = articleCount();
+
+        const discoverCell = findDiscoverMoreCell();
+        const discoverOffset = discoverCell
+          ? getCellOffset(discoverCell)
+          : null;
+        if (discoverCell) hitDiscoverMore = true;
 
         const replyElements = Array.from(
           document.querySelectorAll('article[role="article"]')
         ).filter((el) => {
           if (el === mainPost) return false;
+          if (isPastDiscoverMore(el, discoverOffset)) return false;
           const showText = el.textContent.toLowerCase();
           if (showText.includes("show additional replies")) return false;
+          if (showText.includes("discover more")) return false;
           const replyData = extractReplyData(el, false);
+          if (!replyData.tweetUrl || replyData.tweetUrl === "N/A") return false;
           if (replyData.tweetUrl === mainTweetUrl) return false;
+          if (seenUrls.has(replyData.tweetUrl)) return false;
           return true;
         });
 
         replyElements.forEach((el) => {
           const replyData = extractReplyData(el, false);
-          const existing = repliesWithElements.find(
-            (r) => r.data.tweetUrl === replyData.tweetUrl
-          );
-          if (!existing) {
-            repliesWithElements.push({
-              element: el,
-              data: replyData,
-            });
-          }
+          seenUrls.add(replyData.tweetUrl);
+          repliesWithElements.push({
+            element: el,
+            data: replyData,
+          });
         });
 
+        // Drop anything that slipped past Discover more (virtualized recycle).
+        repliesWithElements = dropRepliesPastDiscoverMore(repliesWithElements);
+
         const currentReplies = repliesWithElements.map((r) => r.data);
-        chrome.runtime.sendMessage({
+        sendRuntimeMessage({
           action: "sendReplies",
           replies: currentReplies,
           mainTweet: mainTweetData,
           status: "loading",
         });
 
-        moreReplies = await scrollToBottom();
+        if (hitDiscoverMore) {
+          moreReplies = false;
+          break;
+        }
+
+        const grew = await scrollToLoadMore(previousCount);
         scrollAttempts++;
+        if (grew) {
+          stagnantRounds = 0;
+          moreReplies = true;
+        } else {
+          stagnantRounds++;
+          moreReplies = stagnantRounds < maxStagnantRounds;
+        }
         if (!isLoading) break; // Exit if loading is stopped
       }
 
+      if (dead) return;
+
+      repliesWithElements = dropRepliesPastDiscoverMore(repliesWithElements);
+      let finalReplies = repliesWithElements
+        .map((r) => r.data)
+        .filter((reply) => reply.tweetUrl !== mainTweetUrl);
+
       // If stopped, send the stopped state with collected replies
       if (!isLoading) {
-        const stoppedReplies = repliesWithElements.map((r) => r.data);
-        chrome.runtime.sendMessage({
+        sendRuntimeMessage({
           action: "sendReplies",
-          replies: stoppedReplies,
+          replies: finalReplies,
           mainTweet: mainTweetData,
           status: "stopped",
         });
         return; // Exit the function
       }
 
-      // After collecting all replies, find the "Discover more" section
-      const discoverMoreSection = Array.from(
-        document.querySelectorAll('div[data-testid="cellInnerDiv"]')
-      ).find((el) => el.textContent.includes("Discover more"));
-
-      let finalReplies = repliesWithElements.map((r) => r.data);
-
-      if (discoverMoreSection) {
-        const discoverMorePosition =
-          discoverMoreSection.getBoundingClientRect().top + window.scrollY;
-        finalReplies = repliesWithElements
-          .filter((r) => {
-            const replyPosition =
-              r.element.getBoundingClientRect().top + window.scrollY;
-            return replyPosition < discoverMorePosition;
-          })
-          .map((r) => r.data);
-      }
-
-      if (mainTweetUrl) {
-        finalReplies = finalReplies.filter(
-          (reply) => reply.tweetUrl !== mainTweetUrl
-        );
-      }
-
-      chrome.runtime.sendMessage({
+      sendRuntimeMessage({
         action: "sendReplies",
         replies: finalReplies,
         mainTweet: mainTweetData,
         status: "complete",
       });
     } catch (error) {
-      chrome.runtime.sendMessage({
-        action: "sendReplies",
-        replies: [],
-        mainTweet: {},
-        status: "error",
-      });
+      if (!dead && isExtensionAlive()) {
+        sendRuntimeMessage({
+          action: "sendReplies",
+          replies: [],
+          mainTweet: {},
+          status: "error",
+        });
+      } else {
+        teardown();
+      }
+    } finally {
+      extracting = false;
     }
   }
 
   // Observe DOM for navigation/changes
-  const observer = new MutationObserver(() => {
+  observer = new MutationObserver(() => {
     injectXtractButton();
   });
 
@@ -410,4 +573,5 @@
   const targetNode =
     document.querySelector('div[data-testid="primaryColumn"]') || document.body;
   observer.observe(targetNode, { childList: true, subtree: true });
+  injectXtractButton();
 })();

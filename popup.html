@@ -5,94 +5,368 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Xtract Replies</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@900&display=swap" rel="stylesheet">
-
     <style>
         :root {
             --primary: #2a9d8f;
+            --primary-deep: #197669;
+            --primary-soft: #d8efeb;
             --secondary: #e9c369;
             --muted: #afd3ce;
-            --muted-text: #6b8783;
-            --background: #f8f8f8;
-            --text-color: #1b263b;
-            --danger: #e63946;
+            --muted-text: #5f7a76;
+            --background: #f4faf8;
+            --surface: rgba(255, 255, 255, 0.78);
+            --text-color: #16332f;
+            --danger: #e04552;
+            --danger-deep: #c22936;
+            --shadow: 0 10px 30px rgba(25, 118, 105, 0.12);
+            --grad-brand: linear-gradient(135deg, #2a9d8f 0%, #197669 100%);
+            --grad-danger: linear-gradient(135deg, #ef6b75 0%, #c22936 100%);
+        }
+
+        * {
+            box-sizing: border-box;
         }
 
         body {
-            font-family: "Vazirmatn", 'Helvetica Neue', Arial, sans-serif;
-            font-optical-sizing: auto;
-            font-weight: 400;
-            font-style: normal;
+            font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
             margin: 0;
-            padding: 10px;
-            width: 580px;
-            height: 360px;
+            padding: 0;
+            width: 360px;
+            min-height: 440px;
             overflow: auto;
-            background: var(--background)
+            color: var(--text-color);
+            background:
+                radial-gradient(ellipse 120% 80% at 10% -10%, rgba(42, 157, 143, 0.22), transparent 55%),
+                radial-gradient(ellipse 90% 70% at 110% 10%, rgba(25, 118, 105, 0.18), transparent 50%),
+                radial-gradient(ellipse 80% 60% at 50% 120%, rgba(233, 195, 105, 0.16), transparent 45%),
+                var(--background);
         }
 
-        #status {
-            margin-bottom: 10px;
-            font-weight: bold;
+        .hidden {
+            display: none !important;
+        }
+
+        #idleView {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            min-height: 440px;
+            padding: 32px 26px 22px;
+            gap: 14px;
+            animation: fadeUp 0.45s ease both;
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        #idleView .logo-wrap {
+            width: 72px;
+            height: 72px;
+            border-radius: 20px;
+            display: grid;
+            place-items: center;
+            background: var(--grad-brand);
+            box-shadow: var(--shadow), 0 0 0 6px rgba(42, 157, 143, 0.12);
+            margin-bottom: 2px;
+        }
+
+        #idleView .logo {
+            width: 38px;
+            height: 40px;
+            filter: brightness(0) invert(1);
+        }
+
+        #idleView h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            background: var(--grad-brand);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        #idleView .guide {
+            margin: 0;
+            font-size: 13px;
+            line-height: 1.55;
+            color: var(--muted-text);
+            max-width: 280px;
+        }
+
+        #idleView .steps {
+            margin: 6px 0 0;
+            padding: 14px 16px;
+            list-style: none;
+            text-align: left;
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--text-color);
+            max-width: 300px;
+            width: 100%;
+            background: var(--surface);
+            border: 1px solid rgba(42, 157, 143, 0.14);
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 24px rgba(22, 51, 47, 0.05);
+        }
+
+        #idleView .steps li {
+            margin: 0;
+            padding: 8px 0 8px 28px;
+            position: relative;
+        }
+
+        #idleView .steps li+li {
+            border-top: 1px solid rgba(42, 157, 143, 0.1);
+        }
+
+        #idleView .steps li::before {
+            content: attr(data-step);
+            position: absolute;
+            left: 0;
+            top: 10px;
+            width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            background: var(--grad-brand);
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 18px;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(25, 118, 105, 0.28);
+        }
+
+        #idleView .steps strong {
+            font-weight: 650;
+        }
+
+        #idleView .steps code {
+            font-family: ui-monospace, "SF Mono", Menlo, monospace;
+            font-size: 11px;
+            background: var(--primary-soft);
+            color: var(--primary-deep);
+            padding: 1px 5px;
+            border-radius: 5px;
+        }
+
+        #idleView .brand {
+            margin-top: auto;
+            padding-top: 10px;
+            font-size: 12px;
+            color: var(--muted-text);
+        }
+
+        #idleView .brand a {
+            color: var(--primary-deep);
+            text-decoration: none;
+            font-weight: 650;
+        }
+
+        #idleView .brand a:hover {
+            text-decoration: underline;
+        }
+
+        #activeView {
+            display: flex;
+            flex-direction: column;
+            padding: 14px;
+            min-height: 440px;
+            animation: fadeUp 0.35s ease both;
+        }
+
+        #statusRow {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding: 10px 12px;
+            font-weight: 650;
+            font-size: 13px;
+            border-radius: 12px;
+            background: var(--surface);
+            border: 1px solid rgba(42, 157, 143, 0.14);
+            backdrop-filter: blur(8px);
+        }
+
+        .spinner {
+            width: 15px;
+            height: 15px;
+            border: 2px solid rgba(42, 157, 143, 0.25);
+            border-top-color: var(--primary-deep);
+            border-radius: 50%;
+            animation: spin 0.75s linear infinite;
+            flex-shrink: 0;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         #replies {
-            max-height: 260px;
+            flex: 1;
+            max-height: 300px;
             overflow-y: auto;
-            border: 1px solid #ccc;
-            padding: 5px;
+            border: 1px solid rgba(42, 157, 143, 0.14);
+            border-radius: 14px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(8px);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
         }
 
         .reply {
-            margin-bottom: 10px;
-            padding: 5px;
-            border-bottom: 1px solid #eee;
+            margin-bottom: 8px;
+            padding: 10px 10px 8px;
+            border: 1px solid rgba(42, 157, 143, 0.1);
+            border-radius: 12px;
+            background: #fff;
+            font-size: 12px;
+            box-shadow: 0 2px 8px rgba(22, 51, 47, 0.04);
+        }
+
+        .reply:last-child {
+            margin-bottom: 0;
         }
 
         .reply p {
-            margin: 2px 0;
+            margin: 3px 0;
         }
 
         .button-container {
-            margin-top: 10px;
+            margin-top: 12px;
             display: flex;
-            gap: 10px;
+            gap: 8px;
+            flex-wrap: wrap;
         }
 
         button {
-            padding: 8px 16px;
-            background-color: var(--primary);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            padding: 10px 14px;
+            background: var(--grad-brand);
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 11px;
             cursor: pointer;
+            font: inherit;
+            font-size: 13px;
+            font-weight: 650;
+            line-height: 1;
+            box-shadow: 0 6px 16px rgba(25, 118, 105, 0.28);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-1px);
+            filter: brightness(1.04);
+            box-shadow: 0 8px 20px rgba(25, 118, 105, 0.34);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        button .btn-icon {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+            display: block;
         }
 
         button:disabled {
-            background-color: var(--muted);
+            background: linear-gradient(135deg, #c7dbd7 0%, #afc9c4 100%);
+            color: rgba(255, 255, 255, 0.85);
             cursor: not-allowed;
+            box-shadow: none;
+            filter: none;
+            transform: none;
         }
 
-        #stop {
-            background-color: var(--danger);
+        #stopGrabbingData {
+            background: var(--grad-danger);
+            box-shadow: 0 6px 16px rgba(194, 41, 54, 0.28);
         }
 
-        #stop:disabled {
-            background-color: var(--muted);
+        #stopGrabbingData:hover:not(:disabled) {
+            box-shadow: 0 8px 20px rgba(194, 41, 54, 0.34);
+        }
+
+        #stopGrabbingData:disabled {
+            background: linear-gradient(135deg, #c7dbd7 0%, #afc9c4 100%);
+            box-shadow: none;
         }
     </style>
 </head>
 
 <body>
-    <div id="status">Loading replies...</div>
-    <div id="replies"></div>
-    <div class="button-container">
-        <button id="downloadCsvBtn" disabled>Download CSV</button>
-        <button id="downloadHtmlBtn" disabled>Download HTML</button>
-        <button id="stopGrabbingData" disabled>Stop</button>
+    <div id="idleView">
+        <div class="logo-wrap">
+            <img class="logo" src="assets/icon.svg" alt="Xtract" width="38" height="40">
+        </div>
+        <h1>Xtract Replies</h1>
+        <p class="guide">Pull every reply from an X post into CSV or HTML — private, local, and fast.</p>
+        <ol class="steps">
+            <li data-step="1">Open any post on <strong>x.com</strong></li>
+            <li data-step="2">Tap the <strong>Xtract</strong> icon under the tweet</li>
+            <li data-step="3">Export when you’re done — nothing leaves your browser</li>
+        </ol>
+        <p class="brand">Built by <a href="https://miraxle.com" target="_blank"
+                rel="noopener noreferrer">miraxle.com</a></p>
+    </div>
+
+    <div id="activeView" class="hidden">
+        <div id="statusRow">
+            <span id="spinner" class="spinner hidden" aria-hidden="true"></span>
+            <span id="status">Loading replies...</span>
+        </div>
+        <div id="replies"></div>
+        <div class="button-container">
+            <button id="downloadCsvBtn" disabled title="Download CSV">
+                <svg class="btn-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5">
+                        <path stroke-linejoin="round" d="M8.5 13.5L8.5 18.5M6.5 16.625L8.5 18.5L10.5 16.625"/>
+                        <path d="M10.0296 2C6.23851 2 4.34296 2 3.17139 3.17157C1.99981 4.34315 2 6.22876 2 10V14C2 17.7712 2 19.6569 3.17157 20.8284"/>
+                        <path d="M3.17139 20.8281C4.34296 21.9997 6.22858 21.9997 9.99981 21.9997L14 22C17.7712 22 19.6569 21.9997 20.8284 20.8281C22 19.6566 22 17.7712 22 14V13.5625"/>
+                        <path stroke-linejoin="round" d="M19.3516 7.61621C20.6558 8.78998 21.3078 9.3774 21.6538 10.1543C21.9998 10.9312 21.9998 11.8085 21.9998 13.5631"/>
+                        <path stroke-linejoin="round" d="M10.0298 2C11.5548 2 12.3173 2.00011 13.0093 2.26562C13.7012 2.53114 14.2651 3.03857 15.3929 4.05365L19.3516 7.61621"/>
+                        <path d="M13 2.5V5C13 7.35702 13 8.53553 13.7322 9.26777C14.4645 10 15.643 10 18 10H21.5"/>
+                    </g>
+                </svg>
+                <span>CSV</span>
+            </button>
+            <button id="downloadHtmlBtn" disabled title="Download HTML">
+                <svg class="btn-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5">
+                        <path stroke-linejoin="round" d="M8.5 13.5L8.5 18.5M6.5 16.625L8.5 18.5L10.5 16.625"/>
+                        <path d="M10.0296 2C6.23851 2 4.34296 2 3.17139 3.17157C1.99981 4.34315 2 6.22876 2 10V14C2 17.7712 2 19.6569 3.17157 20.8284"/>
+                        <path d="M3.17139 20.8281C4.34296 21.9997 6.22858 21.9997 9.99981 21.9997L14 22C17.7712 22 19.6569 21.9997 20.8284 20.8281C22 19.6566 22 17.7712 22 14V13.5625"/>
+                        <path stroke-linejoin="round" d="M19.3516 7.61621C20.6558 8.78998 21.3078 9.3774 21.6538 10.1543C21.9998 10.9312 21.9998 11.8085 21.9998 13.5631"/>
+                        <path stroke-linejoin="round" d="M10.0298 2C11.5548 2 12.3173 2.00011 13.0093 2.26562C13.7012 2.53114 14.2651 3.03857 15.3929 4.05365L19.3516 7.61621"/>
+                        <path d="M13 2.5V5C13 7.35702 13 8.53553 13.7322 9.26777C14.4645 10 15.643 10 18 10H21.5"/>
+                    </g>
+                </svg>
+                <span>HTML</span>
+            </button>
+            <button id="stopGrabbingData" disabled>Stop</button>
+        </div>
     </div>
     <script src="popup.js"></script>
 </body>

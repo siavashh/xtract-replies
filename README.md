@@ -19,14 +19,15 @@ Ideal for researchers, journalists, and social media analysts.
 
 ## Pack for Distribution
 
-To create a distributable version of the extension:
+To create a Chrome Web Store–ready zip:
 
-1. Navigate to the extension folder.
-2. Run the following command in your terminal:
-   ```bash
-   npm run pack
-   ```
-3. This will create a `xtract-replies-{version}.zip` file that you can distribute.
+```bash
+npm run pack
+```
+
+This syncs `manifest.json` version from `package.json` and writes `xtract-replies-{version}.zip` containing only extension runtime files (no `.cursor`, workspace, or source zips).
+
+Upload that zip in the [Chrome Developer Dashboard](https://chrome.google.com/webstore/devconsole).
 
 ## Usage
 
