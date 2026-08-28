@@ -13,9 +13,9 @@ Xtract Replies is a Manifest V3 Chrome Extension that extracts replies from X.co
 - **Service Worker**: `background.js` owns extraction state (`chrome.storage.session`), toolbar badge, and messaging between the content script and `popup.html`.
 - **Permissions**: Include `"storage"` whenever using `chrome.storage.*`. Guard session storage access so a missing API never crashes SW registration.
 - **Toolbar popup only**: Prefer `action.default_popup` + `chrome.action.openPopup()` from the service worker in the same turn as an in-page click. Do **not** open results with `chrome.windows.create` (Chrome blocks that as a popup without a transferable user gesture).
-- **Host Permissions**: Restricted to `"https://x.com/*"`.
-- **Content Scripts**: `main.js` runs on `"https://x.com/*/status/*"` with `run_at: "document_idle"`.
-- **Web Accessible Resources**: `assets/icon.svg` and `assets/48.png` accessible on `https://x.com/*`.
+- **Host Permissions**: Include `https://x.com/*` and `https://www.instagram.com/*`.
+- **Content Scripts**: `main.js` on `https://x.com/*/status/*`; `instagram.js` on `https://www.instagram.com/*`. Both use `run_at: "document_idle"`.
+- **Web Accessible Resources**: `assets/icon.svg` and `assets/48.png` accessible on `https://x.com/*` and `https://www.instagram.com/*`.
 
 ## Version Syncing & Release Packaging
 

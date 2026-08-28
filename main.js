@@ -180,6 +180,7 @@
 
     // Set reply type as Main Tweet or Reply
     tweetData.postType = isMainTweet ? "Main Tweet" : "Reply";
+    tweetData.source = "x";
 
     // Extract username
     const usernameElement = replyElement.querySelector(

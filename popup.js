@@ -1,23 +1,45 @@
 let allReplies = [];
 let mainTweet = {};
+let cachedExportBaseName = null;
+
+function exportHandleToken(value) {
+  return (
+    String(value || "unknown")
+      .replace(/^@/, "")
+      .toLowerCase()
+      .replace(/--+/g, "")
+      .replace(/[^\w.-]/g, "")
+      .slice(0, 50) || "unknown"
+  );
+}
+
+function platformSlug(source) {
+  return source === "instagram" ? "ig" : "x";
+}
+
+function computeExportBaseName() {
+  const source = mainTweet.source || allReplies[0]?.source || "x";
+  const platform = platformSlug(source);
+  const handle = exportHandleToken(mainTweet.handle || mainTweet.username);
+  const now = new Date();
+  const mmdd = `${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  const hhmm = `${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+  return `Xtract-${platform}--${handle}--${mmdd}-${hhmm}`;
+}
+
+function buildExportFileName() {
+  if (!cachedExportBaseName) {
+    cachedExportBaseName = computeExportBaseName();
+  }
+  return cachedExportBaseName;
+}
 
 // Function to convert timestamp to human-readable format
 function convertDate(timestamp) {
-  // Generate filename based on current date and time
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0"); // Months are 0-based, so +1
-  const day = String(now.getDate()).padStart(2, "0");
-  const hours = String(now.getHours()).padStart(2, "0");
-  const minutes = String(now.getMinutes()).padStart(2, "0");
-  const fileName = `Xtract-replies-${year}-${month}-${day}-${hours}-${minutes}`;
-
-  // Handle the timestamp conversion for display
-  if (!timestamp || timestamp === "N/A")
-    return { short: "N/A", full: "N/A", fileName };
+  if (!timestamp || timestamp === "N/A") return { short: "N/A", full: "N/A" };
   try {
     const date = new Date(timestamp);
-    if (isNaN(date.getTime())) return { short: "N/A", full: "N/A", fileName };
+    if (isNaN(date.getTime())) return { short: "N/A", full: "N/A" };
 
     // Full version for the title (includes AM/PM)
     const full = date.toLocaleString("en-US", {
@@ -39,9 +61,9 @@ function convertDate(timestamp) {
       hour12: false, // 24-hour format, effectively removes AM/PM
     });
 
-    return { short, full, fileName };
+    return { short, full };
   } catch (error) {
-    return { short: "N/A", full: "N/A", fileName };
+    return { short: "N/A", full: "N/A" };
   }
 }
 
@@ -58,9 +80,12 @@ function safeXUrl(url) {
   if (!url || url === "N/A" || url === "#") return "";
   try {
     const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return "";
     if (
-      parsed.protocol === "https:" &&
-      (parsed.hostname === "x.com" || parsed.hostname === "twitter.com")
+      parsed.hostname === "x.com" ||
+      parsed.hostname === "twitter.com" ||
+      parsed.hostname === "www.instagram.com" ||
+      parsed.hostname === "instagram.com"
     ) {
       return parsed.href;
     }
@@ -68,9 +93,149 @@ function safeXUrl(url) {
   return "";
 }
 
-function safeHandle(handle) {
+function safeHandle(handle, source) {
   const value = String(handle || "").replace(/^@/, "");
+  if (source === "instagram") {
+    return /^[A-Za-z0-9._]{1,30}$/.test(value) ? value : "";
+  }
   return /^[A-Za-z0-9_]{1,15}$/.test(value) ? value : "";
+}
+
+function profileUrl(handle, source) {
+  const safe = safeHandle(handle, source);
+  if (!safe) return "";
+  if (source === "instagram") {
+    return `https://www.instagram.com/${safe}/`;
+  }
+  return `https://x.com/${safe}`;
+}
+
+function itemsNoun(source, plural = true) {
+  if (source === "instagram") return plural ? "comments" : "comment";
+  return plural ? "replies" : "reply";
+}
+
+function replyLabel(reply, source) {
+  if (source !== "instagram") return "Reply";
+  if (reply.postType === "Reply") return "Nested reply";
+  return "Comment";
+}
+
+function normalizeUrlKey(url) {
+  return String(url || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\/$/, "");
+}
+
+function orderInstagramCommentsThreaded(replies) {
+  const hasNested = replies.some((r) => r.postType === "Reply");
+  if (!hasNested) return replies;
+
+  const tops = [];
+  const childrenByParentUrl = new Map();
+  const childrenByHandle = new Map();
+  const looseNested = [];
+
+  replies.forEach((reply, index) => {
+    const item = { ...reply, _origIndex: index };
+    if (reply.postType === "Reply") {
+      const parentKey = normalizeUrlKey(reply.parentCommentUrl);
+      if (parentKey && parentKey !== "n/a") {
+        if (!childrenByParentUrl.has(parentKey)) {
+          childrenByParentUrl.set(parentKey, []);
+        }
+        childrenByParentUrl.get(parentKey).push(item);
+        return;
+      }
+      if (reply.replyToHandle) {
+        const handleKey = String(reply.replyToHandle).toLowerCase();
+        if (!childrenByHandle.has(handleKey)) {
+          childrenByHandle.set(handleKey, []);
+        }
+        childrenByHandle.get(handleKey).push(item);
+        return;
+      }
+      looseNested.push(item);
+    } else {
+      tops.push(item);
+    }
+  });
+
+  const used = new Set();
+  const result = [];
+
+  function appendChildren(parent) {
+    const urlKey = normalizeUrlKey(parent.tweetUrl);
+    let kids = childrenByParentUrl.get(urlKey) || [];
+    if (!kids.length && parent.handle) {
+      kids = childrenByHandle.get(String(parent.handle).toLowerCase()) || [];
+    }
+    kids.sort((a, b) => {
+      const ta = Date.parse(a.timestamp) || a._origIndex;
+      const tb = Date.parse(b.timestamp) || b._origIndex;
+      return ta - tb;
+    });
+    for (const kid of kids) {
+      if (used.has(kid._origIndex)) continue;
+      used.add(kid._origIndex);
+      result.push(kid);
+    }
+  }
+
+  for (const parent of tops) {
+    result.push(parent);
+    appendChildren(parent);
+  }
+
+  const leftovers = [...looseNested];
+  for (const kids of childrenByParentUrl.values()) leftovers.push(...kids);
+  for (const kids of childrenByHandle.values()) leftovers.push(...kids);
+  leftovers.sort((a, b) => a._origIndex - b._origIndex);
+  for (const kid of leftovers) {
+    if (used.has(kid._origIndex)) continue;
+    used.add(kid._origIndex);
+    result.push(kid);
+  }
+
+  return result.map(({ _origIndex, ...rest }) => rest);
+}
+
+function displayReplies(replies, source) {
+  if (source === "instagram") {
+    return orderInstagramCommentsThreaded(replies);
+  }
+  return replies;
+}
+
+const IG_NESTED_STORAGE_KEY = "igIncludeNestedReplies";
+
+function bindIgNestedCheckbox(id) {
+  const input = document.getElementById(id);
+  if (!input) return;
+
+  chrome.storage.sync.get({ [IG_NESTED_STORAGE_KEY]: false }, (items) => {
+    input.checked = !!items[IG_NESTED_STORAGE_KEY];
+  });
+
+  input.addEventListener("change", () => {
+    chrome.storage.sync.set({ [IG_NESTED_STORAGE_KEY]: input.checked });
+    const twinId =
+      id === "igIncludeNestedRepliesIdle"
+        ? "igIncludeNestedRepliesActive"
+        : "igIncludeNestedRepliesIdle";
+    const twin = document.getElementById(twinId);
+    if (twin) twin.checked = input.checked;
+  });
+}
+
+bindIgNestedCheckbox("igIncludeNestedRepliesIdle");
+bindIgNestedCheckbox("igIncludeNestedRepliesActive");
+
+function getSource(request) {
+  if (request?.mainTweet?.source) return request.mainTweet.source;
+  const first = (request?.replies || [])[0];
+  return first?.source || "x";
 }
 
 function csvCell(value) {
@@ -97,6 +262,8 @@ function applyState(request) {
   const stopBtn = document.getElementById("stopGrabbingData");
   const replies = request.replies || [];
   const status = request.status || "idle";
+  const source = getSource(request);
+  const noun = itemsNoun(source);
   const showIdle = status === "idle" && replies.length === 0;
 
   idleView.classList.toggle("hidden", !showIdle);
@@ -109,20 +276,21 @@ function applyState(request) {
     downloadHtmlBtn.disabled = true;
     stopBtn.disabled = true;
   } else if (status === "loading") {
-    statusDiv.textContent = `Loading replies… ${replies.length} found`;
+    cachedExportBaseName = null;
+    statusDiv.textContent = `Loading ${noun}… ${replies.length} found`;
     downloadCsvBtn.disabled = true;
     downloadHtmlBtn.disabled = true;
     stopBtn.disabled = false;
   } else if (status === "complete" || status === "stopped") {
     statusDiv.textContent =
       status === "complete"
-        ? `Found ${replies.length} replies`
-        : `Stopped. Found ${replies.length} replies`;
+        ? `Found ${replies.length} ${noun}`
+        : `Stopped. Found ${replies.length} ${noun}`;
     downloadCsvBtn.disabled = replies.length === 0;
     downloadHtmlBtn.disabled = replies.length === 0;
     stopBtn.disabled = true;
   } else if (status === "error") {
-    statusDiv.textContent = "Error loading replies.";
+    statusDiv.textContent = `Error loading ${noun}.`;
     downloadCsvBtn.disabled = true;
     downloadHtmlBtn.disabled = true;
     stopBtn.disabled = true;
@@ -130,26 +298,37 @@ function applyState(request) {
 
   allReplies = replies;
   mainTweet = request.mainTweet || {};
+  const visibleReplies = displayReplies(allReplies, source);
   if (showIdle) {
     repliesDiv.innerHTML = "";
     return;
   }
 
-  repliesDiv.innerHTML = allReplies
+  repliesDiv.innerHTML = visibleReplies
     .map((reply, index) => {
+      const label = replyLabel(reply, source);
       const url = safeXUrl(reply.tweetUrl);
       const urlLabel = escapeHtml(reply.tweetUrl || "N/A");
-      return `<div class="reply">
-            <p><strong>Reply ${index + 1}</strong></p>
+      const replyToLine =
+        reply.postType === "Reply" && reply.replyToHandle
+          ? `<p><strong>Reply to:</strong> @${escapeHtml(reply.replyToHandle)}</p>`
+          : "";
+      const nestedStyle =
+        reply.postType === "Reply"
+          ? ' style="margin-left: 14px; border-left: 3px solid rgba(42, 157, 143, 0.25); padding-left: 10px;"'
+          : "";
+      return `<div class="reply"${nestedStyle}>
+            <p><strong>${label} ${index + 1}</strong></p>
             <p><strong>User:</strong> ${escapeHtml(
               reply.username || "N/A",
             )} <span style="color: var(--muted-text);">@${escapeHtml(
               reply.handle || "N/A",
             )}</span></p>
+            ${replyToLine}
             <p><strong>Timestamp:</strong> ${escapeHtml(
               convertDate(reply.timestamp).full,
             )}</p>
-            <p><strong>Tweet URL:</strong> ${
+            <p><strong>URL:</strong> ${
               url
                 ? `<a href="${escapeHtml(url)}" target="_blank">${urlLabel}</a>`
                 : "N/A"
@@ -176,19 +355,20 @@ chrome.runtime.sendMessage({ action: "getExtractionState" }, (state) => {
 
 // Click handler for the stopGrabbingData button
 document.getElementById("stopGrabbingData").addEventListener("click", () => {
+  const noun = itemsNoun(mainTweet.source || allReplies[0]?.source || "x");
   chrome.runtime.sendMessage({ action: "stopLoading" }, (response) => {
     if (response && response.status === "stopped") {
       document.getElementById("stopGrabbingData").disabled = true;
       document.getElementById("status").textContent =
-        `Stopped. Found ${allReplies.length} replies`;
+        `Stopped. Found ${allReplies.length} ${noun}`;
       document.getElementById("downloadCsvBtn").disabled = false;
       document.getElementById("downloadHtmlBtn").disabled = false;
     } else {
       document.getElementById("stopGrabbingData").disabled = true;
       document.getElementById("status").textContent =
         allReplies.length > 0
-          ? `Error stopping. Found ${allReplies.length} replies`
-          : "Error stopping. No replies found.";
+          ? `Error stopping. Found ${allReplies.length} ${noun}`
+          : `Error stopping. No ${noun} found.`;
       document.getElementById("downloadCsvBtn").disabled =
         allReplies.length === 0;
       document.getElementById("downloadHtmlBtn").disabled =
@@ -214,9 +394,11 @@ function sortIconFor(state) {
 document.getElementById("downloadCsvBtn").addEventListener("click", () => {
   const footer =
     "Miraxle,Xtract Replies,,https://miraxle.com,Built with love for X lovers | https://x.com/siavashh";
+  const exportSource = mainTweet.source || allReplies[0]?.source || "x";
+  const exportRows = displayReplies(allReplies, exportSource);
   const csvContent = [
     "username,handle,timestamp,tweetUrl,text,likes,replies,views",
-    ...allReplies.map((reply) => {
+    ...exportRows.map((reply) => {
       return [
         csvCell(reply.username || "N/A"),
         csvCell(reply.handle || "N/A"),
@@ -234,9 +416,8 @@ document.getElementById("downloadCsvBtn").addEventListener("click", () => {
 
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
-  const { fileName } = convertDate();
   link.href = URL.createObjectURL(blob);
-  link.download = `${fileName}.csv`;
+  link.download = `${buildExportFileName()}.csv`;
   link.click();
   URL.revokeObjectURL(link.href);
   notifyBadgeClear();
@@ -244,7 +425,18 @@ document.getElementById("downloadCsvBtn").addEventListener("click", () => {
 
 // Download HTML
 document.getElementById("downloadHtmlBtn").addEventListener("click", () => {
-  const htmlContent = `
+  const exportSource = mainTweet.source || allReplies[0]?.source || "x";
+  const exportNoun = itemsNoun(exportSource);
+  const postNoun = exportSource === "instagram" ? "post" : "tweet";
+  const exportRows = displayReplies(allReplies, exportSource);
+  const nestedCount = allReplies.filter((r) => r.postType === "Reply").length;
+  const showNestedControls = exportSource === "instagram" && nestedCount > 0;
+
+  chrome.storage.sync.get({ igIncludeNestedReplies: false }, (items) => {
+    const nestedCheckedDefault = showNestedControls
+      ? !!items.igIncludeNestedReplies
+      : false;
+    const htmlContent = `
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -392,6 +584,43 @@ document.getElementById("downloadHtmlBtn").addEventListener("click", () => {
           font-size: 12px;
           color: var(--muted-text);
         }
+        .table-controls {
+          max-width: 1200px;
+          margin: 0 auto 12px;
+          padding: 10px 14px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          flex-wrap: wrap;
+          background: var(--surface);
+          border: 1px solid rgba(42, 157, 143, 0.14);
+          border-radius: 12px;
+          font-size: 13px;
+          color: var(--text-color);
+          user-select: none;
+        }
+        .table-controls label {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          font-weight: 600;
+        }
+        .table-controls input {
+          width: 15px;
+          height: 15px;
+          accent-color: var(--primary-deep);
+          cursor: pointer;
+        }
+        .table-controls .hint {
+          color: var(--muted-text);
+          font-size: 12px;
+          font-weight: 500;
+        }
+        tr.nested-reply.nested-hidden {
+          display: none;
+        }
         table {
           width: 100%;
           max-width: 1200px;
@@ -468,6 +697,17 @@ document.getElementById("downloadHtmlBtn").addEventListener("click", () => {
         }
         tr.spam {
           background-color: var(--table-spam);
+        }
+        tr.nested-reply td.user {
+          padding-left: 22px;
+          border-left: 3px solid rgba(42, 157, 143, 0.22);
+        }
+        .reply-to {
+          display: block;
+          font-size: 0.75em;
+          color: var(--muted-text);
+          margin-bottom: 3px;
+          font-weight: 600;
         }
         tbody tr:last-child td {
           border-bottom: none;
@@ -571,9 +811,9 @@ document.getElementById("downloadHtmlBtn").addEventListener("click", () => {
         } style="cursor: pointer;">
         <div class="user">
           ${escapeHtml(mainTweet.username || "N/A")} <span class="handle">${
-            safeHandle(mainTweet.handle)
-              ? `<a href="https://x.com/${safeHandle(
-                  mainTweet.handle,
+            safeHandle(mainTweet.handle, exportSource)
+              ? `<a href="${escapeHtml(
+                  profileUrl(mainTweet.handle, exportSource),
                 )}" onclick="event.stopPropagation();">@${escapeHtml(
                   mainTweet.handle,
                 )}</a>`
@@ -614,16 +854,39 @@ document.getElementById("downloadHtmlBtn").addEventListener("click", () => {
           : ""
       }
       <div class="summary">
-        This tweet by ${escapeHtml(mainTweet.username || "N/A")} (<a href="${escapeHtml(
+        This ${postNoun} by ${escapeHtml(mainTweet.username || "N/A")} (<a href="${escapeHtml(
           safeXUrl(mainTweet.tweetUrl) || "#",
         )}" target="_blank">@${escapeHtml(mainTweet.handle || "N/A")}</a>)
-        has a total of ${escapeHtml(mainTweet.replies || 0)} replies. ${
+        has a total of ${escapeHtml(mainTweet.replies || 0)} ${exportNoun}. ${
           allReplies.length
-        } replies were extracted here. It has received ${escapeHtml(
+        } ${exportNoun} extracted (<span id="visibleCount">${
+          nestedCheckedDefault
+            ? allReplies.length
+            : allReplies.length - nestedCount
+        }</span> shown). It has received ${escapeHtml(
           mainTweet.likes || 0,
-        )} likes and ${escapeHtml(mainTweet.views || 0)} views.
+        )} likes${exportSource === "instagram" ? "." : ` and ${escapeHtml(mainTweet.views || 0)} views.`}
       </div>
-      <p class="tip">Tip: click a column header to sort.</p>
+      ${
+        showNestedControls
+          ? `<div class="table-controls" id="nestedReplyControls">
+        <label for="showNestedReplies">
+          <input type="checkbox" id="showNestedReplies"${
+            nestedCheckedDefault ? " checked" : ""
+          }>
+          Show nested replies (${nestedCount})
+        </label>
+        <span class="hint">Top-level comments only when off.</span>
+      </div>`
+          : ""
+      }
+      <p class="tip">${
+        exportSource === "instagram"
+          ? showNestedControls
+            ? "Comments are grouped by thread. Use the checkbox above or click a column header to sort flat."
+            : "Comments are grouped by thread (replies sit under their parent). Click a column header to sort flat."
+          : "Tip: click a column header to sort."
+      }</p>
       <table id="repliesTable">
         <thead>
           <tr>
@@ -637,10 +900,10 @@ document.getElementById("downloadHtmlBtn").addEventListener("click", () => {
           </tr>
         </thead>
         <tbody>
-          ${allReplies
+          ${exportRows
             .map((reply) => {
               const replyUrl = safeXUrl(reply.tweetUrl);
-              const handle = safeHandle(reply.handle);
+              const handle = safeHandle(reply.handle, exportSource);
               const ts =
                 reply.timestamp && reply.timestamp !== "N/A"
                   ? reply.timestamp
@@ -648,18 +911,26 @@ document.getElementById("downloadHtmlBtn").addEventListener("click", () => {
               const likes = Number(reply.likes) || 0;
               const repliesCount = Number(reply.replies) || 0;
               const views = Number(reply.views) || 0;
+              const isNested = reply.postType === "Reply";
+              const replyToHint =
+                isNested && reply.replyToHandle
+                  ? `<span class="reply-to">↳ @${escapeHtml(reply.replyToHandle)}</span>`
+                  : "";
               return `
                 <tr class="${
                   !reply.timestamp || reply.timestamp === "N/A" ? "spam" : ""
-                }">
+                }${isNested ? " nested-reply" : ""}${
+                  isNested && !nestedCheckedDefault ? " nested-hidden" : ""
+                }" data-post-type="${escapeHtml(reply.postType || "Comment")}">
                   <td class="user" data-value="${escapeHtml(
                     (reply.username || "") + " " + (reply.handle || ""),
                   )}">
+                    ${replyToHint}
                     ${escapeHtml(reply.username || "N/A")} <span class="handle">${
                       handle
-                        ? `<a href="https://x.com/${handle}">@${escapeHtml(
-                            reply.handle,
-                          )}</a>`
+                        ? `<a href="${escapeHtml(
+                            profileUrl(reply.handle, exportSource),
+                          )}">@${escapeHtml(reply.handle)}</a>`
                         : `@${escapeHtml(reply.handle || "N/A")}`
                     }</span>
                   </td>
@@ -706,11 +977,39 @@ document.getElementById("downloadHtmlBtn").addEventListener("click", () => {
           if (!table) return;
           var tbody = table.tBodies[0];
           var headers = table.querySelectorAll("th.sortable");
+          var nestedToggle = document.getElementById("showNestedReplies");
+          var visibleCountEl = document.getElementById("visibleCount");
           var currentKey = null;
           var asc = true;
           var ICON_SORT_VERTICAL = ${JSON.stringify(ICON_SORT_VERTICAL)};
           var ICON_SORT_ASC = ${JSON.stringify(ICON_SORT_ASC)};
           var ICON_SORT_DESC = ${JSON.stringify(ICON_SORT_DESC)};
+
+          function countVisibleRows() {
+            var count = 0;
+            Array.prototype.forEach.call(tbody.rows, function (row) {
+              if (row.classList.contains("nested-hidden")) return;
+              count += 1;
+            });
+            return count;
+          }
+
+          function applyNestedVisibility() {
+            if (!nestedToggle) return;
+            var show = nestedToggle.checked;
+            Array.prototype.forEach.call(tbody.rows, function (row) {
+              if (!row.classList.contains("nested-reply")) return;
+              row.classList.toggle("nested-hidden", !show);
+            });
+            if (visibleCountEl) {
+              visibleCountEl.textContent = String(countVisibleRows());
+            }
+          }
+
+          if (nestedToggle) {
+            nestedToggle.addEventListener("change", applyNestedVisibility);
+            applyNestedVisibility();
+          }
 
           function setSortIcon(th, state) {
             var inner = th.querySelector(".th-inner") || th;
@@ -772,12 +1071,12 @@ document.getElementById("downloadHtmlBtn").addEventListener("click", () => {
     </html>
   `;
 
-  const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8;" });
-  const link = document.createElement("a");
-  const { fileName } = convertDate();
-  link.href = URL.createObjectURL(blob);
-  link.download = `${fileName}.html`;
-  link.click();
-  URL.revokeObjectURL(link.href);
-  notifyBadgeClear();
+    const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `${buildExportFileName()}.html`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    notifyBadgeClear();
+  });
 });

@@ -1,0 +1,61 @@
+---
+description: Instagram DOM extraction guardrails for Xtract comment scraping
+globs: "instagram.js"
+alwaysApply: true
+---
+
+# Instagram DOM Extraction Guardrails
+
+`instagram.js` scrapes post comments from Instagram post modals and `/p/` pages.
+
+## Button Injection
+
+- Inject `.xtract-replies-btn` into the reaction row. On direct `/p/` permalinks, anchor via `div.x1xp8e9x` / `div.x10b6aqq` → `section` → direct-child `div.x78zum5` that contains Like (never a nested `div.x78zum5` inside the Like control).
+- On modal layouts, the `section.x78zum5` element itself is the host.
+- Detect the reaction bar via `svg[aria-label="Like"]` plus any of Comment, Share, Share Post, Repost, or Save.
+- Prune stray buttons outside the active reaction section on SPA rerenders.
+
+## Comment Loading
+
+- Click `button` containing `svg[aria-label="Load more comments"]` when present (modal and many standalone pages).
+- Always scroll the comments column after load-more clicks. **Modal** (`ul._a9z6`): scroll `div.x5wqa0o` (comments side panel), never `[role="dialog"]` or inner `div.x1odjw0f` list wrappers. **Permalink `/p/`**: prefer `div.x5yr21d.xw2csxc.x1odjw0f`. Must have `scrollHeight > clientHeight`; never scroll `window` / `document`.
+- Collect visible comments immediately on button click before any load-more / view-replies / scroll actions; re-collect after each DOM change.
+- Scroll incrementally (~85% viewport per round); after load-more, reset scroller to top so virtualized rows are re-parsed.
+- Expand nested threads via `View replies` (modal `span._a9yi`) or `View all N replies` (permalink `[role="button"]` span).
+- Wait ~1.2–1.5s after each click/scroll before re-querying the DOM.
+- **All loaded**: no load-more button, no view-replies controls, no loading spinner, and `seenKeys` stagnant for 3 rounds. Only new unique comments count as progress.
+
+## Comment Parsing
+
+### Primary: `div._a9zr` metadata blocks
+
+- Collect all `div._a9zr` that contain `a[href*="/c/"] time[datetime]`.
+- Skip caption blocks: `li._a9z5 div._a9zr` (caption has no comment permalink).
+- Works for modal rows (`li._a9zj._a9zl` → `div._a9zr`) and standalone permalink pages where comments use bare `div._a9zr` without an `li` wrapper.
+- Do **not** treat page-wide `li._a9zj` presence as modal layout; unrelated carousel/sidebar items also use those classes.
+- Username: first profile `a[href^="/"][role="link"]` or `h2/h3 a[href^="/"]` in `div._a9zr`.
+- Text: `span._ap3a` or `h1._ap3a`.
+- Timestamp / permalink: `time[datetime]` inside `a[href*="/c/"]`.
+- Likes: `button._a9ze span` inside the same `div._a9zr`.
+- Nested replies: `ul._a9ym`, or `span._a9yi` / `View all N replies` on the comment root.
+
+### Fallback: legacy div-based permalink
+
+- Find comments via `div.xsag5q8` blocks containing `a[href*="/c/"] time[datetime]`, or fall back to bare `a[href*="/c/"]` permalinks.
+- Comment block root: `div._a9zr`, `div.xsag5q8`, or ancestor of username row.
+- Skip caption blocks: direct-child `.x1xegmmw` avatar wrapper without a comment permalink.
+- Username: `a.notranslate._a6hd` → `span._ap3a`.
+- Text: sibling `span[dir="auto"]` outside the username/time header row.
+- Prefer comment body `div.xcy8zhl span[dir="auto"]` — do **not** skip spans that contain `@mention` profile links (that caused nested reply text to become `N/A`).
+- Skip only username header spans (`.xt0psk2` without `.xcy8zhl`, time row, like counts, Reply/See translation).
+- Likes: `span.xuxw1ft` inside `[role="button"]`; missing like count means `0`.
+- Nested replies: `ul._a9ym`, or `div.xpdvgm7` thread lists. Set `postType: Reply`, `replyToHandle` from first `@mention` in body, and `parentCommentUrl` from the parent comment permalink in the same thread root.
+- **Default export**: top-level comments only (`igIncludeNestedReplies` in `chrome.storage.sync`, checkbox in popup). When off, skip `postType === "Reply"` and do not expand view-replies.
+- **Display/export order**: when nested replies are included, group each reply directly under its parent comment in popup, HTML table, and CSV (`orderInstagramCommentsThreaded` in `popup.js`).
+- **HTML export**: if nested rows exist, render a **Show nested replies** checkbox above the table (default follows `igIncludeNestedReplies`); toggling hides/shows `tr.nested-reply` and updates the visible count.
+
+## Main Post
+
+- Caption: prefer `li._a9z5 div._a9zr`, fallback `div._aaqy`.
+- Post likes: first `section span[dir="auto"]` containing `likes`.
+- Post URL: canonical link, pathname `/p/` or `/reel/`, or first `a[href*="/p/"]`.

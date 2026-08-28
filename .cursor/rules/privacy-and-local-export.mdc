@@ -21,3 +21,7 @@ Xtract Replies is a **privacy-first** tool. All data parsing, aggregation, and e
    - Prevent CSV formula injection: fields starting with `=`, `+`, `-`, `@` should be sanitized or quote-wrapped safely.
 2. **HTML Export Sanitization**:
    - Escape HTML entity characters (`&`, `<`, `>`, `"`, `'`) in extracted tweet text before building HTML export tables to prevent XSS during local HTML previewing.
+3. **Export filenames** (`popup.js`):
+   - Pattern: `Xtract-{x|ig}--{handle}--{MMDD}-{HHmm}.{csv|html}` (local export time, zero-padded).
+   - Handle: lowercase, must not contain `--`.
+   - CSV and HTML from the same extraction share one cached basename (only the extension differs).

@@ -313,6 +313,36 @@
             background: linear-gradient(135deg, #c7dbd7 0%, #afc9c4 100%);
             box-shadow: none;
         }
+
+        .ig-option {
+            margin: 0 0 10px;
+            padding: 10px 12px;
+            font-size: 12px;
+            line-height: 1.45;
+            color: var(--text-color);
+            background: var(--surface);
+            border: 1px solid rgba(42, 157, 143, 0.14);
+            border-radius: 12px;
+        }
+
+        .ig-option label {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .ig-option input {
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+
+        .ig-option .hint {
+            display: block;
+            margin-top: 2px;
+            color: var(--muted-text);
+            font-size: 11px;
+        }
     </style>
 </head>
 
@@ -322,12 +352,21 @@
             <img class="logo" src="assets/icon.svg" alt="Xtract" width="38" height="40">
         </div>
         <h1>Xtract Replies</h1>
-        <p class="guide">Pull every reply from an X post into CSV or HTML — private, local, and fast.</p>
+        <p class="guide">Pull replies and comments from X and Instagram into CSV or HTML — private, local, and fast.</p>
         <ol class="steps">
-            <li data-step="1">Open any post on <strong>x.com</strong></li>
-            <li data-step="2">Tap the <strong>Xtract</strong> icon under the tweet</li>
+            <li data-step="1">Open a post on <strong>x.com</strong> or <strong>instagram.com</strong></li>
+            <li data-step="2">Tap the <strong>Xtract</strong> icon on the post</li>
             <li data-step="3">Export when you’re done — nothing leaves your browser</li>
         </ol>
+        <div class="ig-option">
+            <label for="igIncludeNestedRepliesIdle">
+                <input type="checkbox" id="igIncludeNestedRepliesIdle">
+                <span>
+                    Include nested Instagram replies
+                    <span class="hint">Off by default — top-level comments only (best for Pulse).</span>
+                </span>
+            </label>
+        </div>
         <p class="brand">Built by <a href="https://miraxle.com" target="_blank"
                 rel="noopener noreferrer">miraxle.com</a></p>
     </div>
@@ -336,6 +375,15 @@
         <div id="statusRow">
             <span id="spinner" class="spinner hidden" aria-hidden="true"></span>
             <span id="status">Loading replies...</span>
+        </div>
+        <div class="ig-option">
+            <label for="igIncludeNestedRepliesActive">
+                <input type="checkbox" id="igIncludeNestedRepliesActive">
+                <span>
+                    Include nested Instagram replies
+                    <span class="hint">Applies on the next extraction (default: top-level comments only).</span>
+                </span>
+            </label>
         </div>
         <div id="replies"></div>
         <div class="button-container">

@@ -3,7 +3,7 @@
   "name": "Xtract Replies",
   "short_name": "Xtract",
   "version": "1.1.0",
-  "description": "Extract replies from X.com posts and export as CSV/HTML. Ideal for researchers and journalists.",
+  "description": "Extract replies and comments from X.com and Instagram posts and export as CSV/HTML. Ideal for researchers and journalists.",
   "author": "Siavash Keshmiri",
   "homepage_url": "https://x.com/siavashh",
   "icons": {
@@ -28,7 +28,8 @@
     "storage"
   ],
   "host_permissions": [
-    "https://x.com/*"
+    "https://x.com/*",
+    "https://www.instagram.com/*"
   ],
   "content_scripts": [
     {
@@ -37,6 +38,16 @@
       ],
       "js": [
         "main.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://www.instagram.com/*"
+      ],
+      "js": [
+        "instagram.js"
       ],
       "run_at": "document_idle",
       "all_frames": false
@@ -49,7 +60,8 @@
         "assets/48.png"
       ],
       "matches": [
-        "https://x.com/*"
+        "https://x.com/*",
+        "https://www.instagram.com/*"
       ]
     }
   ],
