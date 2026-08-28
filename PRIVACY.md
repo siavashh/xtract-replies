@@ -1,10 +1,10 @@
 # Privacy Policy for Xtract Replies
 
-_Last updated: August 20, 2026_
+_Last updated: August 28, 2026_
 
 ## Overview
 
-Xtract Replies is a Chrome extension that allows users to extract replies from public X.com (Twitter) posts and export them as CSV or HTML files. We are committed to protecting your privacy and ensuring transparency about how your data is handled.
+Xtract Replies is a Chrome extension that allows users to extract replies from public X.com (Twitter) posts and comments from public Instagram posts (beta), and export them as CSV or HTML files. We are committed to protecting your privacy and ensuring transparency about how your data is handled.
 
 ## Data Collection and Usage
 
@@ -20,6 +20,7 @@ Xtract Replies requests the following permissions solely for its core functional
 
 - **storage:** To keep temporary extraction state in the browser session so the toolbar popup can show progress if it is closed and reopened.
 - **host permissions (https://x.com/*):** To run on X.com post pages and extract replies from the page you are viewing.
+- **host permissions (https://www.instagram.com/*):** To run on Instagram post pages and modals and extract comments the user explicitly requests. Instagram support is in beta.
 
 ## Data Security
 
