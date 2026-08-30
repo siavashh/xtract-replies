@@ -12,9 +12,11 @@ alwaysApply: true
 
 1. **Main Post Identification**:
    - Target main post container using `article[role="article"]`.
-   - Inject Xtract button adjacent to Grok actions (`button[aria-label="Grok actions"]`), with fallback only to the top-right More/`[data-testid="caret"]` control.
+   - Inject Xtract into Grok’s own flex cell (`button[aria-label="Grok actions"]` → `parentElement`), appended after Grok — not into the outer header row or the More/`[data-testid="caret"]` group.
+   - Fallback only to More’s cell when Grok is absent.
    - Never inject next to the bottom engagement `[role="group"]` (causes a duplicate button under the tweet).
-   - Prune any `.xtract-replies-btn` that is not in the chosen top-right host.
+   - Wrap the button in `.xtract-replies-wrap` so prune/teardown never removes Grok/More’s cell.
+   - Prune any `.xtract-replies-btn` that is not in the chosen host.
 2. **Reply Metadata Extraction**:
    - Username: `[data-testid="User-Name"] a div[dir="ltr"] span`
    - Handle: `[data-testid="User-Name"] a[href^="/"]`

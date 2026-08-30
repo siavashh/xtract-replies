@@ -102,11 +102,9 @@ CONTACT
 
 Single purpose: Extract public replies from X.com posts and public comments from Instagram posts the user is viewing, and export them locally as CSV or HTML.
 
-storage: Holds temporary extraction progress in chrome.storage.session so the toolbar popup can restore status/counts if closed mid-run. Cleared with the browser session.
+storage: storage is used only for local extension state. chrome.storage.session holds the current extraction (status, reply/comment count, extracted rows, and the source tab id) so the toolbar popup and badge can restore progress if the popup is closed mid-run. That data stays on the device and is cleared when the browser session ends. chrome.storage.sync stores one user preference: whether to include nested Instagram replies (default off). We do not store credentials, browsing history, or analytics, and we do not send stored data to any server.
 
-Host permission https://x.com/*: Content script runs on post pages to read the DOM and collect replies the user explicitly requested.
-
-Host permission https://www.instagram.com/*: Content script runs on Instagram post pages and modals to read the DOM and collect comments the user explicitly requested. Instagram support is beta.
+Host permission justification: Host permissions are limited to https://x.com/* and https://www.instagram.com/*. On X, a content script (main.js) injects an "Xtract" button on post pages, reads reply data from the DOM (usernames, timestamps, text, engagement stats), and sends it to the background script for local CSV/HTML export. On Instagram, a content script (instagram.js) injects the same button in the post reaction row (feed modals and /p/ permalinks; beta), extracts public comments the user requested, and uses the same local export path. The extension does not run on other sites and does not send extracted content to our servers.
 
 ---
 

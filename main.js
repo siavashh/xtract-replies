@@ -22,12 +22,9 @@
       observer = null;
     }
     document.querySelectorAll(".xtract-replies-btn").forEach((btn) => {
-      const wrap = btn.parentElement;
-      if (wrap && wrap.querySelector(".xtract-replies-btn") === btn) {
-        wrap.remove();
-      } else {
-        btn.remove();
-      }
+      const wrap = btn.closest(".xtract-replies-wrap");
+      if (wrap) wrap.remove();
+      else btn.remove();
     });
   }
 
@@ -68,21 +65,26 @@
 
   // Only the top-right tweet chrome (Grok / More). Never [role="group"] —
   // that is the bottom engagement bar and caused a duplicate button.
-  function findInjectAnchor() {
+  // Prefer Grok's own flex cell so we sit beside Grok, not inside the More group.
+  function findInjectHost() {
     const mainPost = getMainPost();
     if (!mainPost) return null;
     const grokBtn = mainPost.querySelector('button[aria-label="Grok actions"]');
-    if (grokBtn && grokBtn.parentElement) return grokBtn.parentElement;
+    if (grokBtn?.parentElement) return grokBtn.parentElement;
     const moreBtn =
       mainPost.querySelector('button[aria-label="More"]') ||
       mainPost.querySelector('[data-testid="caret"]');
-    if (moreBtn && moreBtn.parentElement) return moreBtn.parentElement;
+    if (moreBtn?.parentElement) return moreBtn.parentElement;
     return null;
   }
 
   function removeXtractButton(btn) {
-    const wrap = btn.parentElement;
-    if (wrap && wrap !== document.body && wrap.querySelectorAll(".xtract-replies-btn").length === 1) {
+    const wrap = btn.closest(".xtract-replies-wrap") || btn.parentElement;
+    if (
+      wrap &&
+      wrap !== document.body &&
+      wrap.classList.contains("xtract-replies-wrap")
+    ) {
       wrap.remove();
     } else {
       btn.remove();
@@ -102,16 +104,18 @@
       teardown();
       return;
     }
-    const anchor = findInjectAnchor();
-    if (!anchor || !anchor.parentElement) {
+    const host = findInjectHost();
+    if (!host) {
       pruneStrayButtons(null);
       return;
     }
-    const host = anchor.parentElement;
     pruneStrayButtons(host);
     if (host.querySelector(".xtract-replies-btn")) return;
+    // Dedicated wrapper so prune/teardown never removes Grok/More's cell.
     const wrapper = document.createElement("div");
-    wrapper.className = anchor.className;
+    wrapper.className = "xtract-replies-wrap";
+    wrapper.style.display = "flex";
+    wrapper.style.alignItems = "center";
     const btn = document.createElement("button");
     btn.className = "xtract-replies-btn";
     btn.type = "button";
@@ -146,7 +150,7 @@
     btn.appendChild(img);
     btn.onclick = startExtraction;
     wrapper.appendChild(btn);
-    host.insertBefore(wrapper, anchor.nextSibling);
+    host.appendChild(wrapper);
   }
 
   function sleep(ms) {

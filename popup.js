@@ -232,6 +232,19 @@ function bindIgNestedCheckbox(id) {
 bindIgNestedCheckbox("igIncludeNestedRepliesIdle");
 bindIgNestedCheckbox("igIncludeNestedRepliesActive");
 
+function setIgOptionsVisible(visible) {
+  document.querySelectorAll(".ig-option").forEach((el) => {
+    el.classList.toggle("hidden", !visible);
+  });
+}
+
+function refreshIgOptionsForTab() {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const url = tabs?.[0]?.url || "";
+    setIgOptionsVisible(/instagram\.com/i.test(url));
+  });
+}
+
 function getSource(request) {
   if (request?.mainTweet?.source) return request.mainTweet.source;
   const first = (request?.replies || [])[0];
@@ -265,6 +278,12 @@ function applyState(request) {
   const source = getSource(request);
   const noun = itemsNoun(source);
   const showIdle = status === "idle" && replies.length === 0;
+
+  if (showIdle) {
+    refreshIgOptionsForTab();
+  } else {
+    setIgOptionsVisible(source === "instagram");
+  }
 
   idleView.classList.toggle("hidden", !showIdle);
   activeView.classList.toggle("hidden", showIdle);
@@ -309,14 +328,14 @@ function applyState(request) {
       const label = replyLabel(reply, source);
       const url = safeXUrl(reply.tweetUrl);
       const urlLabel = escapeHtml(reply.tweetUrl || "N/A");
+      const isIgNested = source === "instagram" && reply.postType === "Reply";
       const replyToLine =
-        reply.postType === "Reply" && reply.replyToHandle
+        isIgNested && reply.replyToHandle
           ? `<p><strong>Reply to:</strong> @${escapeHtml(reply.replyToHandle)}</p>`
           : "";
-      const nestedStyle =
-        reply.postType === "Reply"
-          ? ' style="margin-left: 14px; border-left: 3px solid rgba(42, 157, 143, 0.25); padding-left: 10px;"'
-          : "";
+      const nestedStyle = isIgNested
+        ? ' style="margin-left: 14px; border-left: 3px solid rgba(42, 157, 143, 0.25); padding-left: 10px;"'
+        : "";
       return `<div class="reply"${nestedStyle}>
             <p><strong>${label} ${index + 1}</strong></p>
             <p><strong>User:</strong> ${escapeHtml(
@@ -349,9 +368,14 @@ chrome.runtime.onMessage.addListener((request) => {
 });
 
 chrome.runtime.sendMessage({ action: "getExtractionState" }, (state) => {
-  if (chrome.runtime.lastError) return;
+  if (chrome.runtime.lastError) {
+    refreshIgOptionsForTab();
+    return;
+  }
   applyState(state);
 });
+
+refreshIgOptionsForTab();
 
 // Click handler for the stopGrabbingData button
 document.getElementById("stopGrabbingData").addEventListener("click", () => {
@@ -429,7 +453,10 @@ document.getElementById("downloadHtmlBtn").addEventListener("click", () => {
   const exportNoun = itemsNoun(exportSource);
   const postNoun = exportSource === "instagram" ? "post" : "tweet";
   const exportRows = displayReplies(allReplies, exportSource);
-  const nestedCount = allReplies.filter((r) => r.postType === "Reply").length;
+  const nestedCount =
+    exportSource === "instagram"
+      ? allReplies.filter((r) => r.postType === "Reply").length
+      : 0;
   const showNestedControls = exportSource === "instagram" && nestedCount > 0;
 
   chrome.storage.sync.get({ igIncludeNestedReplies: false }, (items) => {
@@ -559,11 +586,19 @@ document.getElementById("downloadHtmlBtn").addEventListener("click", () => {
           display: inline-flex;
           align-items: center;
           gap: 6px;
+          height: 18px;
         }
         .main-tweet .stats svg {
           width: 18px;
           height: 18px;
           color: var(--primary-deep);
+        }
+        .main-tweet .stats span span {
+          font-size: 12px;
+          font-weight: 500;
+          color: var(--muted-text);
+          height: 18px;
+          margin-top: 2px;
         }
         .summary {
           text-align: center;
@@ -785,6 +820,239 @@ document.getElementById("downloadHtmlBtn").addEventListener("click", () => {
           margin: 0 4px;
           color: #197669;
         }
+        .table-wrap {
+          width: 100%;
+          max-width: 1200px;
+          margin: 0 auto;
+        }
+        @media (max-width: 768px) {
+          body {
+            padding: 18px 12px 36px;
+          }
+          .brand-lockup {
+            gap: 10px;
+          }
+          .brand-lockup .logo-wrap {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+          }
+          .brand-lockup .logo-wrap svg {
+            width: 22px;
+            height: 24px;
+          }
+          h1 {
+            font-size: 22px;
+          }
+          .main-tweet {
+            margin: 16px 0;
+            padding: 14px 14px;
+            border-radius: 14px;
+          }
+          .main-tweet:hover {
+            transform: none;
+          }
+          .main-tweet .stats {
+            flex-wrap: wrap;
+            gap: 12px 16px;
+          }
+          .summary {
+            margin: 14px 0;
+            font-size: 13px;
+            text-align: left;
+          }
+          .tip {
+            text-align: left;
+            margin-bottom: 12px;
+          }
+          .table-controls {
+            justify-content: flex-start;
+            padding: 10px 12px;
+          }
+          table {
+            border: none;
+            background: transparent;
+            box-shadow: none;
+            backdrop-filter: none;
+            border-radius: 0;
+            table-layout: auto;
+          }
+          thead {
+            display: none;
+          }
+          tbody {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+          }
+          tbody tr {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-areas:
+              "user user user"
+              "text text text"
+              "likes replies views";
+            column-gap: 8px;
+            row-gap: 6px;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.92) !important;
+            border: 1px solid rgba(42, 157, 143, 0.14);
+            border-radius: 14px;
+            box-shadow: 0 6px 18px rgba(25, 118, 105, 0.1);
+            padding: 10px 12px;
+            overflow: hidden;
+          }
+          tbody tr:hover {
+            background: rgba(255, 255, 255, 0.96) !important;
+          }
+          tr.spam {
+            background: var(--table-spam) !important;
+          }
+          tr.nested-reply {
+            margin-left: 10px;
+            border-left: 3px solid rgba(42, 157, 143, 0.35);
+          }
+          tr.nested-reply td.user {
+            padding-left: 0;
+            border-left: none;
+          }
+          td {
+            display: block;
+            width: auto !important;
+            max-width: none !important;
+            min-width: 0;
+            padding: 0;
+            border-bottom: none;
+            text-align: left;
+            font-size: 14px;
+          }
+          td::before {
+            display: none;
+          }
+          /* Desktop time/link columns — unused on mobile cards */
+          td.timestamp,
+          td.tweetUrl {
+            display: none !important;
+          }
+          td.user {
+            grid-area: user;
+            grid-column: 1 / -1;
+            width: 100% !important;
+            font-size: 0.95em;
+            font-weight: 650;
+            line-height: 1.35;
+          }
+          td.user .handle {
+            font-weight: 500;
+          }
+          .card-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            width: 100%;
+          }
+          .card-identity {
+            flex: 1 1 auto;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+          .card-meta {
+            display: flex;
+            align-items: center;
+            flex: 0 0 auto;
+          }
+          .card-meta button {
+            padding: 5px;
+            border-radius: 8px;
+            background: var(--primary-soft);
+            border: none;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary-deep);
+          }
+          .card-meta button svg {
+            width: 14px;
+            height: 14px;
+          }
+          .card-time {
+            display: block;
+            margin-top: 3px;
+            font-size: 0.78em;
+            font-weight: 500;
+            color: var(--muted-text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          td.text {
+            grid-area: text;
+            grid-column: 1 / -1;
+            width: 100% !important;
+            line-height: 1.45;
+            border-top: 1px solid rgba(42, 157, 143, 0.08);
+            border-bottom: 1px solid rgba(42, 157, 143, 0.08);
+            padding-top: 8px;
+            padding-bottom: 8px;
+            margin: 2px 0;
+          }
+          td.likes,
+          td.replies,
+          td.views {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            width: auto !important;
+            font-variant-numeric: tabular-nums;
+            font-weight: 650;
+            font-size: 13px;
+            padding: 4px 0 0;
+          }
+          td.likes::before,
+          td.replies::before,
+          td.views::before {
+            display: block;
+            content: attr(data-label);
+            color: var(--muted-text);
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+          }
+          td.likes { grid-area: likes; }
+          td.replies { grid-area: replies; }
+          td.views { grid-area: views; }
+          .copyright-footer {
+            margin-top: 22px;
+            font-size: 12px;
+            padding: 0 4px;
+          }
+        }
+        /* Mobile card-meta is hidden on desktop; show table time/link cols */
+        @media (min-width: 769px) {
+          .card-meta,
+          .card-time {
+            display: none;
+          }
+        }
+        @media (max-width: 400px) {
+          body {
+            padding: 14px 10px 28px;
+          }
+          h1 {
+            font-size: 20px;
+          }
+          tbody tr {
+            padding: 9px 10px;
+            row-gap: 5px;
+          }
+        }
       </style>
     </head>
     <body>
@@ -830,7 +1098,9 @@ document.getElementById("downloadHtmlBtn").addEventListener("click", () => {
                 <path d="M16.697 5.5c-1.222-.06-2.679.51-3.89 2.16l-.805 1.09-.806-1.09C9.984 6.01 8.526 5.44 7.304 5.5c-1.243.07-2.349.78-2.91 1.91-.552 1.12-.633 2.78.479 4.82 1.074 1.97 3.257 4.27 7.129 6.61 3.87-2.34 6.052-4.64 7.126-6.61 1.111-2.04 1.03-3.7.477-4.82-.561-1.13-1.666-1.84-2.908-1.91zm4.187 7.69c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.41-4.86-.514-6.67.887-1.79 2.647-2.91 4.601-3.01 1.651-.09 3.368.56 4.798 2.01 1.429-1.45 3.146-2.1 4.796-2.01 1.954.1 3.714 1.22 4.601 3.01.896 1.81.846 4.17-.514 6.67z"></path>
               </g>
             </svg>
+            <span>
             ${escapeHtml(mainTweet.likes || 0)}
+            </span>
           </span>
           <span>
             <svg fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -838,7 +1108,9 @@ document.getElementById("downloadHtmlBtn").addEventListener("click", () => {
                 <path d="M1.751 10c0-4.42 3.584-8 8.005-8h4.366c4.49 0 8.129 3.64 8.129 8.13 0 2.96-1.607 5.68-4.196 7.11l-8.054 4.46v-3.69h-.067c-4.49.1-8.183-3.51-8.183-8.01zm8.005-6c-3.317 0-6.005 2.69-6.005 6 0 3.37 2.77 6.08 6.138 6.01l.351-.01h1.761v2.3l5.087-2.81c1.951-1.08 3.163-3.13 3.163-5.36 0-3.39-2.744-6.13-6.129-6.13H9.756z"></path>
               </g>
             </svg>
+            <span>
             ${escapeHtml(mainTweet.replies || 0)}
+            </span>
           </span>
           <span>
             <svg fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -846,7 +1118,9 @@ document.getElementById("downloadHtmlBtn").addEventListener("click", () => {
                 <path d="M8.75 21V3h2v18h-2zM18 21V8.5h2V21h-2zM4 21l.004-10h2L6 21H4zm9.248 0v-7h2v7h-2z"></path>
               </g>
             </svg>
+            <span>
             ${escapeHtml(mainTweet.views || 0)}
+            </span>
           </span>
         </div>
       </div>
@@ -887,6 +1161,7 @@ document.getElementById("downloadHtmlBtn").addEventListener("click", () => {
             : "Comments are grouped by thread (replies sit under their parent). Click a column header to sort flat."
           : "Tip: click a column header to sort."
       }</p>
+      <div class="table-wrap">
       <table id="repliesTable">
         <thead>
           <tr>
@@ -911,52 +1186,60 @@ document.getElementById("downloadHtmlBtn").addEventListener("click", () => {
               const likes = Number(reply.likes) || 0;
               const repliesCount = Number(reply.replies) || 0;
               const views = Number(reply.views) || 0;
-              const isNested = reply.postType === "Reply";
+              const isNested =
+                exportSource === "instagram" && reply.postType === "Reply";
               const replyToHint =
                 isNested && reply.replyToHandle
                   ? `<span class="reply-to">↳ @${escapeHtml(reply.replyToHandle)}</span>`
                   : "";
+              const timeShort = ts ? convertDate(reply.timestamp).short : "N/A";
+              const timeFull = ts ? convertDate(reply.timestamp).full : "N/A";
+              const linkControl = replyUrl
+                ? `<button type="button" onclick="window.open('${escapeHtml(
+                    replyUrl,
+                  )}', '_blank')" aria-label="Open reply">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5v0a5 5 0 0 1 5-5h3m0 5h6" /></svg>
+                  </button>`
+                : `<span title="AD"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16"><path d="M21 11V12C21 17.4903 16.761 20.1547 14.1014 21.286C13.38 21.5929 13.0193 21.7464 12 21.7464C10.9807 21.7464 10.62 21.5929 9.89856 21.286C7.23896 20.1547 3 17.4903 3 12V6.71888C3 4.52896 3 3.434 3.70725 2.83487C4.4145 2.23574 5.49553 2.41591 7.6576 2.77626L8.71202 2.95199C10.3523 3.22537 11.1724 3.36205 12 3.36205C12.8276 3.36205 13.6477 3.22537 15.288 2.95199L16.3424 2.77626C18.5045 2.41591 19.5855 2.23574 20.2927 2.83487C21 3.434 21 4.52896 21 6.71888V7" stroke="#e63946" stroke-width="1.5" stroke-linecap="round"/><path d="M6.5 9C6.79112 8.4174 7.57665 8 8.5 8C9.42335 8 10.2089 8.4174 10.5 9" stroke="#e63946" stroke-width="1.5" stroke-linecap="round"/><path d="M13.5 9C13.7911 8.4174 14.5766 8 15.5 8C16.4234 8 17.2089 8.4174 17.5 9" stroke="#e63946" stroke-width="1.5" stroke-linecap="round"/><path d="M8.5 15C8.5 15 9.55 14 12 14C14.45 14 15.5 15 15.5 15" stroke="#e63946" stroke-width="1.5" stroke-linecap="round"/></svg></span>`;
               return `
                 <tr class="${
                   !reply.timestamp || reply.timestamp === "N/A" ? "spam" : ""
                 }${isNested ? " nested-reply" : ""}${
                   isNested && !nestedCheckedDefault ? " nested-hidden" : ""
                 }" data-post-type="${escapeHtml(reply.postType || "Comment")}">
-                  <td class="user" data-value="${escapeHtml(
+                  <td class="user" data-label="User" data-value="${escapeHtml(
                     (reply.username || "") + " " + (reply.handle || ""),
                   )}">
-                    ${replyToHint}
-                    ${escapeHtml(reply.username || "N/A")} <span class="handle">${
-                      handle
-                        ? `<a href="${escapeHtml(
-                            profileUrl(reply.handle, exportSource),
-                          )}">@${escapeHtml(reply.handle)}</a>`
-                        : `@${escapeHtml(reply.handle || "N/A")}`
-                    }</span>
+                    <div class="card-head">
+                      <div class="card-identity">
+                        ${replyToHint}
+                        ${escapeHtml(reply.username || "N/A")} <span class="handle">${
+                          handle
+                            ? `<a href="${escapeHtml(
+                                profileUrl(reply.handle, exportSource),
+                              )}">@${escapeHtml(reply.handle)}</a>`
+                            : `@${escapeHtml(reply.handle || "N/A")}`
+                        }</span>
+                      </div>
+                      <div class="card-meta">${linkControl}</div>
+                    </div>
+                    <div class="card-time" title="${escapeHtml(timeFull)}">${escapeHtml(
+                      timeShort,
+                    )}</div>
                   </td>
-                  <td class="timestamp" data-value="${escapeHtml(ts)}" title="${escapeHtml(
-                    ts ? convertDate(reply.timestamp).full : "N/A",
-                  )}">${escapeHtml(
-                    ts ? convertDate(reply.timestamp).short : "N/A",
-                  )}</td>
+                  <td class="timestamp" data-label="Time" data-value="${escapeHtml(ts)}" title="${escapeHtml(
+                    timeFull,
+                  )}">${escapeHtml(timeShort)}</td>
                   <td class="text ${
                     reply.isRTL ? "text-rtl" : "text-ltr"
-                  }" data-value="${escapeHtml(reply.text || "")}">${escapeHtml(
+                  }" data-label="Text" data-value="${escapeHtml(reply.text || "")}">${escapeHtml(
                     reply.text || "N/A",
                   )}</td>
-                  <td class="likes" data-value="${likes}">${likes}</td>
-                  <td class="replies" data-value="${repliesCount}">${repliesCount}</td>
-                  <td class="views" data-value="${views}">${views}</td>
-                  <td class="tweetUrl">
-                    ${
-                      replyUrl
-                        ? `<button onclick="window.open('${escapeHtml(
-                            replyUrl,
-                          )}', '_blank')">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5v0a5 5 0 0 1 5-5h3m0 5h6" /></svg>
-                          </button>`
-                        : `<span title="AD"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 11V12C21 17.4903 16.761 20.1547 14.1014 21.286C13.38 21.5929 13.0193 21.7464 12 21.7464C10.9807 21.7464 10.62 21.5929 9.89856 21.286C7.23896 20.1547 3 17.4903 3 12V6.71888C3 4.52896 3 3.434 3.70725 2.83487C4.4145 2.23574 5.49553 2.41591 7.6576 2.77626L8.71202 2.95199C10.3523 3.22537 11.1724 3.36205 12 3.36205C12.8276 3.36205 13.6477 3.22537 15.288 2.95199L16.3424 2.77626C18.5045 2.41591 19.5855 2.23574 20.2927 2.83487C21 3.434 21 4.52896 21 6.71888V7" stroke="#e63946" stroke-width="1.5" stroke-linecap="round"/><path d="M6.5 9C6.79112 8.4174 7.57665 8 8.5 8C9.42335 8 10.2089 8.4174 10.5 9" stroke="#e63946" stroke-width="1.5" stroke-linecap="round"/><path d="M13.5 9C13.7911 8.4174 14.5766 8 15.5 8C16.4234 8 17.2089 8.4174 17.5 9" stroke="#e63946" stroke-width="1.5" stroke-linecap="round"/><path d="M8.5 15C8.5 15 9.55 14 12 14C14.45 14 15.5 15 15.5 15" stroke="#e63946" stroke-width="1.5" stroke-linecap="round"/></svg></span>`
-                    }
+                  <td class="likes" data-label="Likes" data-value="${likes}">${likes}</td>
+                  <td class="replies" data-label="Replies" data-value="${repliesCount}">${repliesCount}</td>
+                  <td class="views" data-label="Views" data-value="${views}">${views}</td>
+                  <td class="tweetUrl" data-label="Link">
+                    ${linkControl}
                   </td>
                 </tr>
               `;
@@ -964,6 +1247,7 @@ document.getElementById("downloadHtmlBtn").addEventListener("click", () => {
             .join("")}
         </tbody>
       </table>
+      </div>
       
       <footer class="copyright-footer">
         <p>
