@@ -1,4 +1,4 @@
-# Chrome Web Store listing copy — Xtract Replies 1.2.0
+# Chrome Web Store listing copy — Xtract Replies 1.3.0
 
 Use these blocks in the Developer Dashboard. Keep the short description under 132 characters.
 
@@ -87,6 +87,14 @@ CONTACT
 • GitHub issues / PRs: https://github.com/siavashh/xtract-replies
 
 ---
+
+## What’s new in 1.3.0
+
+• Responsive HTML export for mobile — compact reply cards, readable on phones
+• Xtract button sits next to Grok (not under the More menu)
+• Hide “Include nested Instagram replies” on X.com (Instagram only)
+• Fix empty X HTML exports caused by nested-reply filtering
+• Clearer storage / host-permission justifications for Web Store review
 
 ## What’s new in 1.2.0
 
